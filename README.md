@@ -34,15 +34,11 @@ The main features are:
 - **no coding is needed**. Just some configuration in YAML files. In fact this repo only contains 1 file ``config-fan.yaml``.
 - **No resistors, capacitors or difficult soldering needed**. The fan and the temperature sensor plug straight onto the pins of the ESP32. Although I did mount mine on a perfboard for cleanliness and put it in a case.
 
-!["graphs"](images/demo.jpg)
+
 
 This is a screenshot from Home Assistant. I'll show you how to setup this dashboard.
 
 ## Visuals
-!["inside cabinet"](images/inside.jpg)
-!["controller"](images/real1.jpg)
-!["fans"](images/real2.jpg)
-
 
 ## Parts (~$29 USD)
 
