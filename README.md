@@ -1,18 +1,24 @@
-# ESPHome Fan Controller
+# ESPHome Solar Inverter Fan Controller (Deye SUN 12K)
 
-This project describes how to build a quiet thermostat controlled fan for cooling your media console, gaming cupboard or anything else.
+**Based on this Projekt:**  https://github.com/patrickcollins12/esphome-fan-controller
 
-The software is ESPHome and Home Assistant. The hardware is an ESP32 with a regular 12v 120mm Computer Fan (PWM) and a Temperature Sensor (DHT11).
+This project describes how to build a quiet thermostat controlled fan for cooling your Solarinverter.
 
-## Cost
-The electronic parts are $29 USD including the ESP32. 
+The software is ESPHome and Home Assistant. The hardware is an ESP32 with three 12v 140mm Computer Fan (4-Pin PWM) and a Temperature Sensor (DS18B20) and Small OLED Display.
+
+## Partlist
+ - 3x 140mm 4-PIN PWM PC FANs
+ - 3x 140mm FAN Grill
+ - 1x ESP32 (ESP32-C3 Super Mini)
+ - 1x 0,96" OLED Display
+ - 1x 12V -> 3,3V voltage Regulator
+ - 1x DS18B20 OneWire Temperatur Sensor
+ - 1x 3D Printed Cooling HUT
 
 ## Motivation
-My sons's Playstation 5 sits in our TV Console which runs hotter than Sol. Also in that Media Console is a Macmini, a Raspberry Pi and a few other devices. My wife likes to keep the door neat and closed, so it needs some cooling!
+- Keep the Inverter more cool -> extend Lifetime
+- Prevent extern / internal cooler to stay off -> reduce noise level of the Inverter
 
-I previously had a thermostat which simply toggled the fan when the temperature crossed a threshold. That didn't work for me because the fans were loud and toggling on/off. Very wife-unfriendly and annoying when you're watching a movie to hear the fan buzzing every other minute. The process led me to this smart thermostat which intelligently controls the speed of the 12v-fan to maintain a perfect temperature in your cabinet. It will find and hold the fan at the necessary power level (like 22% power) to keep a cupboard cool and adjust as necessary.
-
-!["closed cabinet"](images/fortnite.jpg)
 
 ## Features
 The main features are:
@@ -22,7 +28,7 @@ The main features are:
 - uses ESP32's Wifi to connect to Home Assistant for control and reporting
 - the ESP32 is standalone and so the cooling function will continue to operate without Wifi. Doesn't need HomeAssistant or Wifi to operate. Wifi is only needed for setup, manual control and reporting.
 - **no screen** is needed on the device itself, all management is done via Home Assistant
-- my system uses two fans for extra cooling. Depending on how much air you need to draw through your enclosed space you could use 1 or 2 fans
+- my system uses 3 Fans (up to you to use more or less).
 - it is easily extendable to control up to 10 separate enclosed spaces with separate temperature sensors as well. You're only limited by the Amps of your 12v Power Brick and the pins on your ESP32.
 - **manual speed control** over ride if you don't want to use PID Control
 - **no coding is needed**. Just some configuration in YAML files. In fact this repo only contains 1 file ``config-fan.yaml``.
