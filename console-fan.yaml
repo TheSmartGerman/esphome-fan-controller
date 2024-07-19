@@ -1,8 +1,42 @@
+#########################
+# INITIAL SETUP
+# GPIOs 
+# Pinout for ESP32-C3 Super Mini
+# https://www.sudo.is/docs/esphome/boards/esp32c3supermini/
+# https://git.sudo.is/ben/infra/src/branch/main/roles/hass-esphome/files/packages/boards/esp32c3supermini.yaml
+
 substitutions:
-  friendly_name: Console Fan
+  name: inveter-fan-controller
+  friendly_name: Inverter Fan Controller
+  # GPIO - Pin definition
+  gpio_status_led: GPIO8
+  gpio_temp_sensor: GPIO0
+  gpio_pwm_fan: GPIO1
+  gpio_fan_seeed_1: GPIO2 
+  gpio_fan_speed_2: GPIO3
+  gpio_fan_speed_3: GPIO4
+  # I2C - Display
+  gpio_i2c_sda: GPIO6
+  gpio_i2c_scl: GPIO7
+  # UART - Not used yet
+  # Possible to HW-Debug set bautrate
+  gpio_uart_rx: GPIO20
+  gpio_uart_tx: GPIO21
+  # one Wire - Adresses
+  dallas_address: "0x0d031455f7ffff28"
 
 esphome:
-  name: console-fan
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2024.6.0 # OTA / OneWire Breaking changes
+  name_add_mac_suffix: false
+  project:
+    name: esp32.inveter_ext_fan_controller
+    version: '0.1.0'
+  platformio_options:
+    board_build.f_flash: 40000000L
+    board_build.flash_mode: dio
+    board_build.flash_size: 4MB
 
 # Throttle writing parameters to the internal flash memory to reduce ESP memory wear / degradation
 preferences:
@@ -13,27 +47,52 @@ preferences:
 # ESP32 AND NETWORK SETUP
 
 esp32:
-  board: nodemcu-32s
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
   framework:
     type: arduino
 
+# Enable logging
 # pid climate log update is noisy, dial it back to warn
 logger:
-  level: DEBUG
+  level: debug
+  baud_rate : 0 # disable hardware output
   logs: 
     climate: ERROR
-    dht: WARN
+#   dht: WARN
 
 # default HA integration, OTA updater and backup http web portal
+# Enable Home Assistant API
 api:
-ota:
-wifi:
 
-  # Read the wifi/pass from secrets.yaml:
-  # wifi_ssid: "My Wifi XX"
-  # wifi_password: "XXXXXXX"
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
+# Allow Over-The-Air updates see changes 2024.6.0
+ota:
+- platform: esphome
+
+packages:
+  wifi: !include common/wifi.yaml
+  debug: !include common/debug.yaml
+
+# see changes 2024.6.0
+one_wire:
+  - platform: gpio
+    pin: ${gpio_temp_sensor}
+
+i2c:
+  sda: ${gpio_i2c_sda}
+  scl: ${gpio_i2c_scl}
+  id: i2c_ssd1306
+
+light:
+  # https://esphome.io/components/status_led
+  - platform: status_led
+    name: "Status LED"
+    id: esp_status_led
+    icon: "mdi:alarm-light"
+    pin:
+      number: ${gpio_status_led}
+      inverted: true
+    restore_mode: ALWAYS_OFF
 
 number:
 
@@ -129,6 +188,10 @@ text_sensor:
     id: uptime_human
     icon: mdi:clock-start
 
+binary_sensor:
+  - platform: status
+    id: system_status
+
 sensor:
 
   # Send WiFi signal strength & uptime to HA
@@ -163,14 +226,41 @@ sensor:
               ).c_str();
 
   # Read the Tacho PIN and show measured RPM as a sensor (only with 4-pin PWM fans!)
-
+  # FAN 1
   - platform: pulse_counter
     pin: 
-      number: GPIO25   # Connect to any input PIN on the ESP
+      number: ${gpio_fan_seeed_1}   # Connect to any input PIN on the ESP
       mode: INPUT_PULLUP
     unit_of_measurement: 'RPM'
-    id: fan_speed
-    name: $friendly_name Fan Speed
+    id: fan_speed_1
+    name: $friendly_name Fan 1 Speed
+    update_interval: 10s
+    accuracy_decimals: 0
+    filters:
+      - multiply: 0.5  # Depending on how many pulses the fan sends per round - should be 0.5 or 1 - try...
+
+  # FAN 2
+  - platform: pulse_counter
+    pin: 
+      number: ${gpio_fan_speed_2}   # Connect to any input PIN on the ESP
+      mode: INPUT_PULLUP
+    unit_of_measurement: 'RPM'
+    id: fan_speed_2
+    name: $friendly_name Fan 2 Speed
+    update_interval: 10s
+    accuracy_decimals: 0
+    filters:
+      - multiply: 0.5  # Depending on how many pulses the fan sends per round - should be 0.5 or 1 - try...
+
+  # FAN 3
+  - platform: pulse_counter
+    pin: 
+      number: ${gpio_fan_speed_3}   # Connect to any input PIN on the ESP
+      mode: INPUT_PULLUP
+    unit_of_measurement: 'RPM'
+    id: fan_speed_3
+    name: $friendly_name Fan 3 Speed
+    update_interval: 10s
     accuracy_decimals: 0
     filters:
       - multiply: 0.5  # Depending on how many pulses the fan sends per round - should be 0.5 or 1 - try...
@@ -213,24 +303,47 @@ sensor:
     id: in_deadband_term
     accuracy_decimals: 0
 
+# Target Temp from Climat  
+  - platform: template
+    name: $friendly_name Target Temperature
+    id: target_temp
+    accuracy_decimals: 2
+
   # GET TEMP/HUMIDITY FROM DHT11
-  - platform: dht
-    pin: GPIO33
-    temperature:
-      name: "Temperature"
-      id: console_fan_temperature
-      accuracy_decimals: 3
+  #- platform: dht
+  #  pin: GPIO33
+  #  temperature:
+  #    name: "Temperature"
+  #    id: console_fan_temperature
+  #    accuracy_decimals: 3
 
       # If you don't smooth the temperature readings 
       # the PID controller over reacts to small changes.
-      filters:
-         - exponential_moving_average:  
-             alpha: 0.1
-             send_every: 1
+ #     filters:
+ #        - exponential_moving_average:  
+ #            alpha: 0.1
+ #            send_every: 1
 
-    humidity:
-      name: "Humidity"
-      id: console_fan_humidity
+ #   humidity:
+ #     name: "Humidity"
+ #     id: console_fan_humidity
+
+    # the DHT11 can only be read every 1s. Use 1.3s to be safe.
+ #   update_interval: 1.3s
+
+## One Wire Sensore
+  - platform: dallas_temp
+    address: ${dallas_address}
+    name: "Temperature"
+    id: console_fan_temperature
+    accuracy_decimals: 3
+
+    # If you don't smooth the temperature readings 
+    # the PID controller over reacts to small changes.
+    filters:
+      - exponential_moving_average:  
+          alpha: 0.1
+          send_every: 1
 
     # the DHT11 can only be read every 1s. Use 1.3s to be safe.
     update_interval: 1.3s
@@ -244,11 +357,11 @@ sensor:
     id: fan_speed_pwm_voltage
 
 output:
-  # Wire this pin (13) into the PWM pin of your 12v fan
+  # Wire this pin into the PWM pin of your 12v fan
   # ledc is the name of the pwm output system on an esp32
   - platform: ledc
     id: console_fan_speed
-    pin: GPIO13
+    pin: ${gpio_pwm_fan}
 
     # 25KHz is standard PC fan frequency, minimises buzzing
     frequency: "25000 Hz" 
@@ -256,7 +369,7 @@ output:
     # my fans stop working below 13% powerful.
     # also they're  powerful and loud, cap their max speed to 80%
     min_power: 13%
-    max_power: 80%
+    max_power: 100% # 80%
 
     # At 0, actually turn it off, otherwise the power keeps going.
     zero_means_zero: true
@@ -320,11 +433,14 @@ climate:
       - sensor.template.publish:
           id: e_term
           state: !lambda 'return -id(console_thermostat).get_error_value();'
+      - sensor.template.publish:
+          id: target_temp
+          state: !lambda 'return id(console_thermostat).target_temperature;'
         
     # The extents of the HA Thermostat
     visual:
       min_temperature: 20 °C
-      max_temperature: 50 °C
+      max_temperature: 60 °C
   
     # See the README for setting up these parameters.
     # These are over ridden by the number templates above.
@@ -354,15 +470,15 @@ switch:
 # Restart every day at 12:30am. 
 # I've had some memory issues lockup 
 # the device after a couple weeks
-time:
-  - platform: homeassistant
-    on_time:
+#time:
+#  - platform: homeassistant
+#    on_time:
       # Every morning at 12:30am
-    - seconds: 0
-      minutes: 30
-      hours: 0
-      then:
-       - switch.turn_on: console_fan_restart
+#    - seconds: 0
+#      minutes: 30
+#      hours: 0
+#      then:
+#       - switch.turn_on: console_fan_restart
 
 
 # I was able to find good KP,KI,KD values manually, per the instructions,
@@ -375,3 +491,130 @@ button:
   on_press: 
     - climate.pid.autotune: console_thermostat
     
+# https://esphome.io/components/display/ssd1306.html?highlight=display%20i2c
+# Font https://github.com/edx/edx-fonts/tree/master/open-sans
+font:
+- file: "fonts/OpenSans-Regular.ttf"
+    #url: "https://github.com/edx/edx-fonts/blob/master/open-sans/fonts/Regular/OpenSans-Regular.ttf"
+    #type: web
+  id: my_font_h1
+  size: 20
+
+- file: "fonts/OpenSans-Regular.ttf"
+    #url: "https://github.com/edx/edx-fonts/blob/master/open-sans/fonts/Regular/OpenSans-Regular.ttf"
+    #type: web
+  id: my_font_h2
+  size: 18
+
+- file: "fonts/OpenSans-Regular.ttf"
+    #url: "https://github.com/edx/edx-fonts/blob/master/open-sans/fonts/Regular/OpenSans-Regular.ttf"
+    #type: web
+  id: my_font_h3
+  size: 16
+
+- file: "fonts/OpenSans-Regular.ttf"
+    #url: "https://github.com/edx/edx-fonts/blob/master/open-sans/fonts/Regular/OpenSans-Regular.ttf"
+    #type: web
+  id: my_font_p
+  size: 12
+
+- file: "fonts/OpenSans-Regular.ttf"
+    #url: "https://github.com/edx/edx-fonts/blob/master/open-sans/fonts/Regular/OpenSans-Regular.ttf"
+    #type: web
+  id: my_font_small
+  size: 10
+
+# For example cycle through pages on a timer
+interval:
+  - interval: 5s
+    then:
+      - display.page.show_next: my_display
+      - component.update: my_display
+
+display:
+  - platform: ssd1306_i2c
+    model: "SH1106 128x64"
+    id: my_display
+    # or 'ssd1306'
+    #reset_pin: D0
+    address: 0x3C
+    i2c_id: i2c_ssd1306
+    pages:
+    - id: page1
+      lambda: |-
+        it.printf(0, 0, id(my_font_small), "Now: %.1f°C", id(console_fan_temperature).state);
+        it.printf(64, 0, id(my_font_small), "Goal: %.1f°C", id(target_temp).state);
+        it.printf(0, 11, id(my_font_small), "FAN 1: %.0f rpm", id(fan_speed_1).state);
+        it.printf(0, 22, id(my_font_small), "FAN 2: %.0f rpm", id(fan_speed_2).state);
+        it.printf(0, 33, id(my_font_small), "FAN 3: %.0f rpm", id(fan_speed_3).state);    
+        it.printf(0, 44, id(my_font_small), "FAN Speed: %.0f %", id(fan_speed_pwm_voltage).state);
+
+    - id: page2
+      lambda: |-
+        it.printf(0, 0, id(my_font_small), "FAN 100rpm/div 10min");
+        it.graph(0, 14, id(multi_rpm_graph));    
+  
+    - id: page3
+      lambda: |-
+        it.printf(0, 0, id(my_font_small), "Temp 10°C/div 10min");
+        it.graph(0, 14, id(multi_temperature_graph));   
+
+## https://esphome.io/components/display/#graph-component
+## https://koen.vervloesem.eu/blog/showing-a-graph-on-a-display-with-esphome/
+graph:
+  # Show bare-minimum auto-ranged graph
+  - id: single_temperature_graph
+    sensor: console_fan_temperature
+    duration: 10min
+    width: 126
+    height: 64
+    border: false
+
+  - id: multi_temperature_graph
+    duration: 10min
+    x_grid: 1min
+    y_grid: 10.0     # degC/div
+    border: false
+    width: 126
+    height: 50
+    traces:
+      - sensor: console_fan_temperature
+        line_type: DASHED
+        line_thickness: 1
+        color: my_green
+      - sensor: target_temp
+        line_type: SOLID
+        line_thickness: 2
+        color: my_red
+
+  - id: multi_rpm_graph
+    duration: 10min
+    x_grid: 1min
+    y_grid: 100.0     # degC/div
+    border: false
+    width: 126
+    height: 50
+    traces:
+      - sensor: fan_speed_pwm_voltage
+        line_type: DOTTED
+        continuous: true
+        line_thickness: 1
+        color: my_blue
+
+color:
+  - id: my_red
+    red: 100%
+    green: 0%
+    blue: 0%
+  - id: my_green
+    red: 0%
+    green: 100%
+    blue: 0%
+  - id: my_blue
+    red: 0%
+    green: 0%
+    blue: 100%
+  - id: my_yellow
+    red: 100%
+    green: 100%
+    blue: 0%
