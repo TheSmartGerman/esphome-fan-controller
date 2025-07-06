@@ -1,0 +1,251 @@
+substitutions:
+  name: "esp32-c3-supermini-fan-basic"
+  friendly_name: "Inverter Fan Controller Basic"
+  # GPIO - Pin definition
+  gpio_vin: GPIO0   # GPIO0 - VIN ?
+  gpio_temp: GPIO9 # onewire
+  gpio_pwm_fan: GPIO10 # PWM OUtput
+  # gpio 2 strapped pin - boot mode
+  gpio_fan_seeed_1: GPIO1 
+  gpio_fan_speed_2: GPIO3
+  gpio_fan_speed_3: GPIO4
+  # ? GIPO5 - Only usable when WiFi not configured on the device ?
+  # I2C - Display
+  gpio_i2c_sda: GPIO6
+  gpio_i2c_scl: GPIO7
+  gpio_led_status: GPIO8  # Built In LED GPIO8
+  # Strapped Pin GPI09 Bootmode
+  # GPIO 10 - free
+  # UART - Not used yet
+  # possible for RS485 Modbus ?
+  gpio_uart_rx: GPIO20 # or OneWire (JP2)
+  gpio_uart_tx: GPIO21 # or RPM4 (JP1)
+  # one Wire - Adresses
+  # dallas_address: "0x0d031455f7fxxxxxx" - only one Senosr so need to adress them
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2024.6.0
+  name_add_mac_suffix: false
+  project:
+    name: esp32.inveter_ext_fan_controller
+    version: '0.1.0'
+  platformio_options:
+    board_build.f_flash: 40000000L
+    board_build.flash_mode: dio
+    board_build.flash_size: 4MB
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
+  framework:
+    type: arduino
+
+# Throttle writing parameters to the internal flash memory to reduce ESP memory wear / degradation
+preferences:
+  flash_write_interval: 15min
+
+# Enable logging
+# pid climate log update is noisy, dial it back to warn
+logger:
+  level: debug
+  baud_rate : 0 # disable hardware output
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  password: !secret ota_password
+  platform: esphome
+
+packages:
+  wifi: !include
+    file: common/wifi.yaml
+    vars:
+      varFriendlyName: ${friendly_name}
+      varName: ${name}
+
+  debug: !include common/debug32.yaml
+  common: !include 
+    file: common/common.yaml
+    vars: 
+        varFriendlyName: ${friendly_name}
+
+web_server:
+  port: 80
+
+# New sind 2024.6.0
+one_wire:
+  - platform: gpio
+    pin: ${gpio_temp}
+
+i2c:
+  sda: ${gpio_i2c_sda}
+  scl: ${gpio_i2c_scl}
+  id: i2c_ssd1306
+
+light:
+  # https://esphome.io/components/status_led
+  - platform: status_led
+    name: "Status LED"
+    id: esp_status_led
+    icon: "mdi:alarm-light"
+    pin:
+      number: ${gpio_led_status}
+      inverted: true
+    restore_mode: RESTORE_AND_OFF
+
+binary_sensor:
+  - platform: status
+    id: system_status
+
+sensor:
+  - platform: adc
+    id: input_voltage
+    pin: ${gpio_vin}
+    attenuation: auto
+    name: "Supply Voltage"
+    accuracy_decimals: 2
+    update_interval: 3s
+    filters:
+      - multiply: 4.15 #adjust acording to input voltage divider 
+
+  # Read the Tacho PIN and show measured RPM as a sensor (only with 4-pin PWM fans!)
+  # FAN 1
+  - platform: pulse_counter
+    pin: 
+      number: ${gpio_fan_seeed_1}   # Connect to any input PIN on the ESP
+      mode: INPUT_PULLUP
+    unit_of_measurement: 'RPM'
+    id: fan_speed_1
+    name: $friendly_name Fan 1 Speed
+    update_interval: 3s
+    accuracy_decimals: 0
+    filters:
+      - multiply: 0.5  # Depending on how many pulses the fan sends per round - should be 0.5 or 1 - try...
+
+  # FAN 2
+  - platform: pulse_counter
+    pin: 
+      number: ${gpio_fan_speed_2}   # Connect to any input PIN on the ESP
+      mode: INPUT_PULLUP
+    unit_of_measurement: 'RPM'
+    id: fan_speed_2
+    name: $friendly_name Fan 2 Speed
+    update_interval: 3s
+    accuracy_decimals: 0
+    filters:
+      - multiply: 0.5  # Depending on how many pulses the fan sends per round - should be 0.5 or 1 - try...
+
+  # FAN 3
+  - platform: pulse_counter
+    pin: 
+      number: ${gpio_fan_speed_3}   # Connect to any input PIN on the ESP
+      mode: INPUT_PULLUP
+    unit_of_measurement: 'RPM'
+    id: fan_speed_3
+    name: $friendly_name Fan 3 Speed
+    update_interval: 3s
+    accuracy_decimals: 0
+    filters:
+      - multiply: 0.5  # Depending on how many pulses the fan sends per round - should be 0.5 or 1 - try...
+
+  # Tempsensor
+  - platform: dallas_temp
+    #address: ${dallas_address} - only needed if there is more than one sensor
+    name: "Temperature"
+    id: temp_sensor_onewire
+    accuracy_decimals: 3
+
+    # If you don't smooth the temperature readings 
+    # the PID controller over reacts to small changes.
+    filters:
+      - exponential_moving_average:  
+          alpha: 0.1
+          send_every: 1
+
+    # the DHT11 can only be read every 1s. Use 1.3s to be safe.
+    update_interval: 1.3s
+
+  # Reports how long the device has been powered (in minutes)
+  - platform: uptime
+    name: ${friendly_name} Uptime
+    filters:
+      - lambda: return x / 60.0;
+    unit_of_measurement: minutes
+
+output:
+  # Wire this pin (13) into the PWM pin of your 12v fan
+  # ledc is the name of the pwm output system on an esp32
+  - platform: ledc
+    id: fan_speed
+    pin: ${gpio_pwm_fan}
+    inverted: true
+
+    # 25KHz is standard PC fan frequency, minimises buzzing 
+    # See Design Spec. Intel 4-PWM Fan
+    frequency: "25000 Hz" 
+
+    # my fans stop working below 13% powerful.
+    # also they're  powerful and loud, cap their max speed to 80%
+    min_power: 10%
+    max_power: 100%
+
+    # At 0, actually turn it off, otherwise the power keeps going.
+    zero_means_zero: true
+
+fan:
+  - platform: speed
+    id: manual_fan_control
+    output: fan_speed
+    speed_count: 100
+    name: "Fan Speed"
+
+number:
+  - platform: template
+    name: Fan Speed Control
+    id: fan_speed_control
+    internal: False
+    max_value: 100.0
+    min_value: 0.0
+    step: 1
+    optimistic: True
+    mode: SLIDER
+    on_value:
+      then:
+        - output.set_level: 
+            id: fan_speed
+            level: !lambda "return x/100;"
+
+button:
+  # Expose an ESP32 restart button to HA
+  - platform: restart
+    name: ${friendly_name} ESP32 Restart
+    id: console_fan_restart
+
+# https://esphome.io/components/display/ssd1306.html?highlight=display%20i2c
+# Font https://github.com/edx/edx-fonts/tree/master/open-sans
+font:
+- file: "fonts/OpenSans-Regular.ttf"
+    #url: "https://github.com/edx/edx-fonts/blob/master/open-sans/fonts/Regular/OpenSans-Regular.ttf"
+    #type: web
+  id: my_font_small
+  size: 10
+
+display:
+  - platform: ssd1306_i2c
+    model: "SH1106 128x64"
+    id: my_display
+    address: 0x3C
+    i2c_id: i2c_ssd1306
+    pages:
+    - id: page1
+      lambda: |-
+        it.printf(0, 0, id(my_font_small), "VIN :%.2f V", id(input_voltage).state); 
+        it.printf(0, 11, id(my_font_small), "FAN 1: %.0f rpm", id(fan_speed_1).state);
+        it.printf(0, 22, id(my_font_small), "FAN 2: %.0f rpm", id(fan_speed_2).state);
+        it.printf(0, 33, id(my_font_small), "FAN 3: %.0f rpm", id(fan_speed_3).state);
+        it.printf(0, 44, id(my_font_small), "Temp: %.0f °C", id(temp_sensor_onewire).state);   

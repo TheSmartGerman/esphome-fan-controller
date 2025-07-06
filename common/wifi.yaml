@@ -3,7 +3,19 @@ wifi:
   password: !secret wifi_password
 
   ap:
-    ssid: !secret wifi_ap_ssid
+    ssid: "AP_${varName}"
     password: !secret wifi_ap_password
 
 captive_portal:
+
+text_sensor:
+  # Send IP Address
+  - platform: wifi_info
+    ip_address:
+      name: ${varFriendlyName} IP Address
+
+sensor:
+  # Send WiFi signal strength & uptime to HA
+  - platform: wifi_signal
+    name: ${varFriendlyName} WiFi Strength
+    update_interval: 60s
