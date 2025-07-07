@@ -109,13 +109,7 @@ On request I can provide SMD assembled PCB or completed kit (shipping in EU). Co
 ## Installing the software onto the ESP32
 
 ### Get this repo
-Clone this github repository.
-From the command line and then cd into the directory
-
-```
-git clone https://github.com/patrickcollins12/esphome-fan-controller.git
-cd esphome-fan-controller
-```
+Clone this github repository or download zip file.
 
 ### Review the YAML and read the ESPHome docs.
 
