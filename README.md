@@ -6,6 +6,10 @@ This project describes how to build a quiet thermostat controlled fan for coolin
 
 The software is ESPHome and Home Assistant. The hardware is an ESP32 with three 12v 140mm Computer Fan (4-Pin PWM) and a Temperature Sensor (DS18B20) and Small OLED Display.
 
+<img src="images/hut_font.jpg" width=300>
+<img src="images/hut_back.jpg" width=300>
+<img src="images/pcb_w_disp_working.jpg" width=300>
+
 ## Partlist
  - 3x 140mm 4-PIN PWM PC FANs
  - 3x 140mm FAN Grill
@@ -13,33 +17,30 @@ The software is ESPHome and Home Assistant. The hardware is an ESP32 with three 
  - 1x 0,96" OLED Display
  - 1x 12V -> 3,3V voltage Regulator
  - 1x DS18B20 OneWire Temperatur Sensor
- - 1x 3D Printed Cooling HUT
+ - 1x [3D Printed Cooling HUT](/3d_print/Deye12kTopCoolingV3.zip)
 
 ## Motivation
 - Keep the Inverter more cool -> extend Lifetime
-- Prevent extern / internal cooler to stay off -> reduce noise level of the Inverter
+- Prevent extern / internal FAns to stay off -> reduce noise level of the Inverter (depends also on FW of the inverter)
 
 
 ## Features
 The main features are:
 
 - the **fan dynamically adjusts** it's speed based on the temperature sensor using a Process Control mechanism called PID
-- **adjustable target temperature**. I currently target 30degC but maybe in winter I'll reduce it to 27.
+- **adjustable target temperature**. I currently target 35°C. 
 - uses ESP32's Wifi to connect to Home Assistant for control and reporting
 - the ESP32 is standalone and so the cooling function will continue to operate without Wifi. Doesn't need HomeAssistant or Wifi to operate. Wifi is only needed for setup, manual control and reporting.
 - **no screen** is needed on the device itself, all management is done via Home Assistant. Display Data is just for information.
-- my system uses 3 Fans (up to you to use more or less).
+- System uses 3 Fans (up to you to use more or less).
 - it is easily extendable
 - **manual speed control** over ride if you don't want to use PID Control
 - **no coding is needed**. Just some configuration in YAML files. 
 
-This is a screenshot from Home Assistant. I'll show you how to setup this dashboard.
-
-## Visuals
-
 ## Parts
 
-- **DHT11** or **DS18B20** - Any Temperature sensor ESPHome can handle will be fine. I had / prefere the OneWire type. But with only one temp. sensor any sensor is fine. If you like to have more than one. OneWire will be easier to extend. I'm using the one on a board with 3-pins. <br><img src="images/dht-11.png" width="100">
+- **DHT11** or **DS18B20** - Any Temperature sensor ESPHome can handle will be fine. I had / prefere the OneWire type. But with only one temp. sensor any sensor is fine. If you like to have more than one. OneWire will be easier to extend. I'm using the one on a board with 3-pins. <br>Preferd: <img src="images/DS18B20.jpg" width="100"> Works also:<img src="images/dht-11.png" width="100">
+<br>
 
 - **12v PWM 4-pin Computer Fan** - I'm using 3 x [140mm Corsair fans](https://www.corsair.com/us/en/Categories/Products/Fans/Magnetic-Levitation-Fans/ml-config/p/CO-9050039-WW). Any 12v PWM-controllable fan should work. Cost $8-$15 USD. I recommend getting high quality fans if you care about noise and need to move a lot of air<br><img src="images/corsair-fan.png" width="100">. 
 
@@ -47,9 +48,9 @@ This is a screenshot from Home Assistant. I'll show you how to setup this dashbo
 
 - **12v DC Female Jack** - with wire outlets. You can normally buy these with the Power Adapter<br><img src="images/12v%20jack.jpg" width="100"> or <img src="images/12v%20jack%202.png" width="100"> 
 
-- **LM2596** or **Mini360** - to convert 12v down to 3.3v. Cost $1.50 each (normally in packs of 6-10)<br><img src="images/LM2596.png" width="100"> 
+- **LM2596** or **Mini360** - to convert 12v down to 3.3v. Cost $1.50 each (normally in packs of 6-10)<br><img src="images/mini360.jpg" width="100"> or <img src="images/LM2596.png" width="100"> 
 
-- **ESP32-C3**. You can use any ESP32. But this one is quit small and cheap<br><img src="images/nodemcu-esp32.png" width="100"> 
+- **ESP32-C3** or **ESP32 Dev Kit**. You can use any ESP32. But this one is quit small and cheap<br><img src="images/esp32c3mini.jpg" width="100"> or <img src="images/nodemcu-esp32.png" width="100"> 
 
 ## Choosing a Good Fan
 You need a 4-pin fan which has PWM. 3-pin fans aren't acceptable, they are just on/off with tachometer sensor.
@@ -83,14 +84,27 @@ NOTE: if you don't join your 3.3v and 12v ground wires together your fan will ke
 This projects focus is now on a own custom PCB to have a small footprint and more options.
 
 ***Improvements***
-- PWM is driven by a externel Transistor (MosFET)
+- PWM is driven by a externel transistor (MosFET)
 - PulsCounter Signal have some protective circuits to ESP input pins
 - optional PullUp / PullDown resistors
 - optional input voltage measurement
 - optional Display, just plug an play
-- Dedicated 4-Pin Molex style connectors for FANs
-- Extention pin header for e.g. UART
+- Dedicated 3-Pin Molex style connectors for FANs (4th FAN possible)
+- Extention pin header for e.g. UART (optional)
 
+Early prototype & final PCB working
+<br>
+<img src="images/Prototype.jpg" width=200>
+<img src="images/pcb_w_disp_working.jpg" width=200>
+
+Some pictures only PCB with and without display
+
+<img src="images/pcb_wo_disp.jpg" width=200>
+<img src="images/pcb_w_disp_black.jpg" width=200>
+
+On request I can provide SMD assembled PCB or completed kit (shipping in EU). Contact: crazyhazle@gmx.de
+
+<img src="images/pcb_full_kit.jpg" width=300>
 
 ## Installing the software onto the ESP32
 
@@ -105,22 +119,73 @@ cd esphome-fan-controller
 
 ### Review the YAML and read the ESPHome docs.
 
-Review the YAML file.
+Review the YAML file. Change the device name from ``console-fan`` to whatever seems appropriate. You might want to change the yaml filename as well.
 
-Ensure the pins are set correctly for the PWM Fan (ledc) and the DS18B10 / DHT-11
+**Ensure the pins are set correctly** for the PWM Fan (ledc) and the DS18B10 / DHT-11
 
-Review the instructions for [the ESPHome Climate Thermostat](https://esphome.io/components/climate/index.html), [ESPHome PID Climate Thermostat](https://esphome.io/components/climate/pid.html) and the [DHT-11 sensor](https://esphome.io/components/sensor/dht.html) / [DS18B20 sensor] https://esphome.io/components/sensor/dallas_temp.html
+All GPIOs are define by subtitutions:
 
-Change the device name from ``console-fan`` to whatever seems appropriate. You might want to change the yaml filename as well.
+```yaml
+substitutions:
+  name: "esp32-c3-supermini"
+  friendly_name: "Inverter Fan Controller"
+  # GPIO - Pin definition
+  gpio_vin: GPIO0   # GPIO0 - VIN
+  # gpio 2 strapped pin - boot mode
+  gpio_fan_seeed_1: GPIO1 
+  gpio_fan_speed_2: GPIO3
+  gpio_fan_speed_3: GPIO4
+  # ? GIPO5 - Only usable when WiFi not configured on the device ?
+  # I2C - Display
+  gpio_i2c_sda: GPIO6
+  gpio_i2c_scl: GPIO7
+  gpio_led_status: GPIO8  # Built In LED GPIO8
+  # Strapped Pin GPI09 Bootmode, but internal pullup
+  gpio_temp: GPIO9 # onewire
+  gpio_pwm_fan: GPIO10 # PWM OUtput
+
+  # UART - Not used yet
+  # possible for RS485 Modbus ?
+  gpio_uart_rx: GPIO20 # or alternative OneWire (JP2)
+  gpio_uart_tx: GPIO21 # or RPM4 (JP1)
+
+  # one Wire - Adresses
+  # dallas_address: "0x0d031455f7fxxxxxx" - only one Senosr so need to adress them
+```
+
+Review the instructions for 
+- [the ESPHome Climate Thermostat](https://esphome.io/components/climate/index.html)
+-  [ESPHome PID Climate Thermostat](https://esphome.io/components/climate/pid.html)
+- [DS18B20 sensor](https://esphome.io/components/sensor/dallas_temp.html) / [DHT-11 sensor](https://esphome.io/components/sensor/dht.html)
+
+
 
 ### Setup your temperature sensor
 
 Set the correct pin for your temp sensor. Note that the DHT11 sensor is setup to use an exponential moving average. Without this filter the PID controller reacts to every minor sensor movement. If you have a faster sensor like the BME260 you might need to tweak this filter.
 
+For OneWire:
+
+```yaml
+  - platform: dallas_temp
+    #address: ${dallas_address} - only needed if there is more than one sensor
+    name: "Temperature"
+    id: temp_sensor_onewire
+    accuracy_decimals: 3
+
+    # If you don't smooth the temperature readings 
+    # the PID controller over reacts to small changes.
+    filters:
+      - exponential_moving_average:  
+          alpha: 0.1
+          send_every: 1
+```
+For DHT:
+
 ```yaml
   # GET TEMP/HUMIDITY FROM DHT11
   - platform: dht
-    pin: GPIO33
+    pin: ${gpio_temp}
     temperature:
       name: "Temperature"
       id: console_fan_temperature
@@ -141,12 +206,12 @@ Set the correct pin for your temp sensor. Note that the DHT11 sensor is setup to
 
 Make sure you connect your fan to a PWM capable GPIO. All ESP32 pins that can act as outputs can be used as PWM pins but GPIOs 34-39 can’t generate PWM.
 
-Also note that my fans stop spinning below 13% power, so I set that as the minimum. I have a max power of 80% applied to the fans to make them wife-friendly. You might want to remove this minimum or maximum. 
+Also note that some fans stop spinning below a certain power  e.g. 13%, so set that as the minimum.  Also a max power can be applied to the fans to make them less noisy (e.g. 80%). You might want to remove this minimum or maximum. 
 
 ```yaml
   - platform: ledc
     id: console_heat_speed
-    pin: GPIO27
+    pin: ${gpio_pwm_fan}
 
     # 25KHz is standard PWM PC fan frequency, minimises buzzing
     frequency: "25000 Hz"
@@ -162,22 +227,34 @@ Also note that my fans stop spinning below 13% power, so I set that as the minim
 
 Edit your wifi credentials in secrets.yaml. The .gitignore will prevent you accidentally uploading your wifi credentials to github.
 
+I defined some common packages, feel free to use them.
+
+```yaml
+packages:
+  wifi: !include
+    file: common/wifi.yaml
+    vars:
+      varFriendlyName: ${friendly_name}
+      varName: ${name}
+
+  debug: !include common/debug32.yaml
+  common: !include 
+    file: common/common.yaml
+    vars: 
+        varFriendlyName: ${friendly_name}
+```
+
 ### Install ESPHome
 
 [Install ESPHome](https://esphome.io/guides/installing_esphome.html) according to the instructions on the ESPHome website.
 
-I prefer command-line on Mac:
-``pip3 install esphome``
-
-Most people use the ESPHome that runs inside Home Assistant. You can use that too.
+Most people use the ESPHome that runs inside Home Assistant. You can use that too. The most simple way is to use [Web - ESPHome](https://web.esphome.io/)
 
 ### Install to ESP32
 
 Connect your ESP32 via USB to your computer, then upload the Firmware to the ESP32.
 
-`` esphome run console-fan.yaml``
-
-At this time if you've set the pins right, the sensor should be spitting out values and the PID can control the fan.
+At this time if you've set the pins right, the sensor should be spitting out values and the PID can control the fan. The basic example will show Input Voltage, FAN1 - FAN3 RPM and Current Temp.
 
 Success! 
 
@@ -211,6 +288,8 @@ Multiple sensors and switches are exposed by the ESPHome software.
 You also need to setup the dashboard. I'll explain those two steps below.
 
 ## Setting up the Home Assistant Dashboard
+
+***Important***: This steps are from the orginal repo. May some adjustems have to be done.
 
 ![dashboard](images/ha.jpg)
 
@@ -411,5 +490,6 @@ The kd (D in PID) is meant to pre-react and backoff early. Small parameters can 
 
 In my first contribution to ESPHome I added [Deadband to PID Climate](https://esphome.io/components/climate/pid.html#deadband-setup). Follow the instructions there to ensure that your fans stop oscillating once it reachs the correct target temperature.
 
-### Tell me
-I'm keen to hear what PID parameters works for your fan.
+### Thanks
+Special thanks to: https://github.com/patrickcollins12 
+

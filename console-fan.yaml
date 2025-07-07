@@ -8,22 +8,40 @@
 substitutions:
   name: inveter-fan-controller
   friendly_name: Inverter Fan Controller
+
   # GPIO - Pin definition
-  gpio_status_led: GPIO8
-  gpio_temp_sensor: GPIO0
-  gpio_pwm_fan: GPIO1
-  gpio_fan_seeed_1: GPIO2 
+  gpio_vin: GPIO0   #VIN
+  gpio_vin_adjust: 4.15 # Ajust to Input voltage
+  
+  # gpio 2 strapped pin - boot mode - 10k pull down
+  
+  # FANs
+  gpio_fan_seeed_1: GPIO1 
   gpio_fan_speed_2: GPIO3
   gpio_fan_speed_3: GPIO4
+  # ? GIPO5 - Only usable when WiFi not configured on the device ?
+  
   # I2C - Display
   gpio_i2c_sda: GPIO6
   gpio_i2c_scl: GPIO7
-  # UART - Not used yet
-  # Possible to HW-Debug set bautrate
-  gpio_uart_rx: GPIO20
-  gpio_uart_tx: GPIO21
+
+  # Status LED
+  gpio_led_status: GPIO8  # Built In LED GPIO8
+
+  # OneWire
+  # Strapped Pin GPI09 Bootmode 10k pullup at pcb
+  gpio_temp: GPIO9 # onewire
   # one Wire - Adresses
-  dallas_address: "0x0d031455f7ffff28"
+  # dallas_address: "0x0d031455f7fxxxxxx" - only one Senosr so need to adress them
+
+  # PWM
+  gpio_pwm_fan: GPIO10 # PWM OUtput
+
+  # UART - Not used yet
+  # possible for RS485 Modbus ?
+  gpio_uart_rx: GPIO20 # or OneWire (JP2)
+  gpio_uart_tx: GPIO21 # or RPM4 (JP1)
+
 
 esphome:
   name: ${name}
@@ -76,7 +94,7 @@ packages:
 # see changes 2024.6.0
 one_wire:
   - platform: gpio
-    pin: ${gpio_temp_sensor}
+    pin: ${gpio_temp}
 
 i2c:
   sda: ${gpio_i2c_sda}
@@ -265,6 +283,15 @@ sensor:
     filters:
       - multiply: 0.5  # Depending on how many pulses the fan sends per round - should be 0.5 or 1 - try...
 
+  - platform: adc
+    id: input_voltage
+    pin: ${gpio_vin}
+    attenuation: auto
+    name: "Supply Voltage"
+    accuracy_decimals: 2
+    update_interval: 3s
+    filters:
+      - multiply: ${gpio_vin_adjust} #adjust acording to input voltage divider 
 
 ########################################################
 # START THE FAN CONTROLLER SETUP
@@ -333,7 +360,7 @@ sensor:
 
 ## One Wire Sensore
   - platform: dallas_temp
-    address: ${dallas_address}
+    #address: ${dallas_address}
     name: "Temperature"
     id: console_fan_temperature
     accuracy_decimals: 3
@@ -526,7 +553,7 @@ font:
 
 # For example cycle through pages on a timer
 interval:
-  - interval: 5s
+  - interval: 15s
     then:
       - display.page.show_next: my_display
       - component.update: my_display
